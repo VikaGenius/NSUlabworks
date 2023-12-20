@@ -19,17 +19,25 @@ int setting_proxy_socket() {
         exit(EXIT_FAILURE);
     }
 
+    //настройка сокета для повторного использования порта
+    int opt = 1;
+    if (setsockopt(proxy_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
+
     //настраиваем адрес и порт прокси-сокета
     proxy_addr.sin_family = AF_INET;
     proxy_addr.sin_addr.s_addr = INADDR_ANY;
     proxy_addr.sin_port = htons(8080);
 
-    // привязываем прокси-сокет к адресу и порту
+    //привязываем прокси-сокет к адресу и порту
     if (bind(proxy_socket, (struct sockaddr*)&proxy_addr, sizeof(proxy_addr)) < 0) {
         perror("Ошибка при привязке прокси-сокета");
         exit(EXIT_FAILURE);
     }
-    // Ожидаем соединений от клиентов
+
+    //слушаем клиентиков
     if (listen(proxy_socket, 5) < 0) {
         perror("Ошибка при ожидании соединений");
         exit(EXIT_FAILURE);
@@ -41,10 +49,12 @@ int setting_proxy_socket() {
 }
 
 void get_host(char* buffer, char* host) {
-    char *first_line = strtok(buffer, "\n");
+    char buffer_copy[MAX_BUFFER_SIZE];
+    strcpy(buffer_copy, buffer);
+    char *first_line = strtok(buffer_copy, "\n");
     char *url = strtok(first_line + 4, " ");
     
-    int port = 8080;
+    int port;
 
     sscanf(url, "http://%[^:/]:%d", host, &port);
 }
@@ -66,24 +76,21 @@ int connect_and_get_server_socket(char *host) {
     for (p = result; p != NULL; p = p->ai_next) {
         server_socket = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
         if (server_socket == -1) {
-            continue; // ошибка при создании сокета, пробуем следующий адрес
+            continue; // Ошибка при создании сокета, пробуем следующий адрес
         }
 
         if (connect(server_socket, p->ai_addr, p->ai_addrlen) != -1) {
-            //inet_ntop
             break;
         } else {
             perror("Ошибка при установлении соединения с удаленным сервером");
             close(server_socket);
             return -1;
         }
-    }
+    }    
 
-    printf("CONNECT\n");
     freeaddrinfo(result);
     return server_socket;
 }
-
 
 void handle_client(int client_socket) {
     char buffer[MAX_BUFFER_SIZE];
@@ -97,11 +104,11 @@ void handle_client(int client_socket) {
         return;
     }
 
-    printf("RECV: %ld\n", bytes_received);
+    printf("RECV: %s\n", buffer);
 
     char host[MAX_BUFFER_SIZE];
     get_host(buffer, host);
-    printf("HOST: %s \n", host);
+
     int server_socket = connect_and_get_server_socket(host);
 
     if (send(server_socket, buffer, bytes_received, 0) < 0) {
@@ -111,9 +118,7 @@ void handle_client(int client_socket) {
         return;
     }
 
-    printf("SEND MSG TO SERVER\n");
-
-    // Получаем данные от сервера и пересылаем их клиенту
+    // получаем данные от сервера и пересылаем их клиенту
     while ((bytes_received = recv(server_socket, buffer, sizeof(buffer), 0)) > 0) {
         if (send(client_socket, buffer, bytes_received, 0) < 0) {
             perror("Ошибка при отправке данных клиенту");
@@ -121,12 +126,9 @@ void handle_client(int client_socket) {
         }
     }
 
-    printf("RECIVE MSG AND SEND TO CLIENT \n");
-
-    // Закрываем соединения
+    // закрываем соединения
     close(client_socket);
     close(server_socket);
-
 }
 
 void *client_handler(void *arg) {
@@ -155,17 +157,15 @@ void accept_connection(int proxy_socket) {
 
         printf("[*] Принято соединение от: %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
-        // Создаем новый поток для обработки клиента
+        // создаем новый поток для обработки клиента
         if (pthread_create(&thread_id, NULL, client_handler, (void *)&client_socket) < 0) {
             perror("Ошибка при создании потока для обработки клиента");
             close(client_socket);
             continue;
         }
 
-        // Освобождаем ресурсы потока после завершения
         pthread_detach(thread_id);
     }
-
 }
 
 int main() {
