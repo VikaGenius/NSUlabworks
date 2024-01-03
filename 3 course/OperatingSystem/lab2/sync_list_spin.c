@@ -9,11 +9,13 @@
 typedef struct _Node {
     char value[SIZE];
     struct _Node* next;
-    pthread_mutex_t sync;
+    pthread_spinlock_t sync;
 } Node;
 
 typedef struct _Storage {
     Node *head;
+    pthread_spinlock_t sync_list;
+
 } Storage;
 
 typedef int (*CompareFunc)(size_t, size_t);
@@ -27,7 +29,7 @@ int iter_count_less = 0;
 int iter_count_great = 0;
 int iter_count_equal = 0;
 
-int iter_swap_count = 0;
+_Atomic int iter_swap_count = 0;
 
 void* monitor() {
     while(1) {
@@ -55,7 +57,7 @@ void append(Storage* list, char* data) {
     assert(tmp);
 
     memcpy(tmp->value, data, strlen(data));
-    pthread_mutex_init(&tmp->sync, NULL);
+    pthread_spin_init(&tmp->sync, PTHREAD_PROCESS_SHARED);
 
     Node* current_node = list->head;
 
@@ -73,6 +75,7 @@ void append(Storage* list, char* data) {
 Storage* init(int count) {
     Storage* list = (Storage*)malloc(sizeof(Storage));
     assert(list);
+    pthread_spin_init(&list->sync_list, PTHREAD_PROCESS_SHARED);
 
     for (int i = 0; i < count; i++) {
         char data[SIZE];
@@ -87,29 +90,64 @@ Storage* init(int count) {
 //как только перекинули указатель first->next на третий элемент, захватываем лочку на 2-4 элементах
 void random_nodes_swap(Storage* list) {
     assert(list->head);
-        
-    pthread_mutex_lock(&list->head->sync);
+    
+    pthread_spin_lock(&list->sync_list);
+    pthread_spin_lock(&list->head->sync);
     Node* first = list->head;
+    
     Node* second = NULL;
+
+    if (first->next && rand() % 2 == 1) {
+        pthread_spin_lock(&first->next->sync);
+        second = first->next;
+        if (second->next) {
+            pthread_spin_lock(&second->next->sync);
+            first->next = second->next;
+            pthread_spin_unlock(&second->next->sync);
+        } else {
+            first->next = second->next; //по факту будет нулл
+        }
+        second->next = first;
+        
+        list->head = second;
+        pthread_spin_unlock(&list->sync_list);
+        pthread_spin_unlock(&second->sync);
+
+    } else {
+        if (first->next) {
+            pthread_spin_lock(&first->next->sync);
+            list->head = first->next;
+            pthread_spin_unlock(&first->next->sync);
+        }
+        pthread_spin_unlock(&list->sync_list);
+    }
+    
     Node* third = NULL;
 
     while (first->next) {
-        pthread_mutex_lock(&first->next->sync);
+        pthread_spin_lock(&first->next->sync);
         second = first->next;
         if (second->next) {
-            pthread_mutex_lock(&second->next->sync);
+            pthread_spin_lock(&second->next->sync);
             third = second->next;
             if (third != NULL && rand() % 2 == 1) { 
                 first->next = third;
-                second->next = third->next;
+
+                if (third->next) {
+                    pthread_spin_lock(&third->next->sync);
+                    second->next = third->next;
+                    pthread_spin_unlock(&third->next->sync);
+                } else {
+                    second->next = third->next; //по факту нулл
+                }
                 third->next = second;
             }
-            pthread_mutex_unlock(&third->sync);
+            pthread_spin_unlock(&third->sync);
         }
-        pthread_mutex_unlock(&first->sync);
+        pthread_spin_unlock(&first->sync);
         first = second;
     }
-    pthread_mutex_unlock(&first->sync);
+    pthread_spin_unlock(&first->sync);
 }
 
 void* swap_thread_func(void* arg) {
@@ -136,31 +174,33 @@ int equal(size_t a, size_t b) {
 }
 
 void count_good_pair(Storage* list, int (*cmp)(size_t, size_t)) {
-    if (list == NULL) {
-        return;
-    }
+    assert(list);
 
     int cgp = 0; // считаем хорошие пары)))
+
+    pthread_spin_lock(&list->sync_list);
+    pthread_spin_lock(&list->head->sync);
     Node* current = list->head;
-    while (current && current->next) {
-        pthread_mutex_lock(&current->sync);
+    pthread_spin_unlock(&list->sync_list);
+
+    Node* other = NULL;
+
+    while (current->next) {
+        pthread_spin_lock(&current->next->sync);
+        other = current->next;
+
         size_t len1 = strlen(current->value);
+        size_t len2 = strlen(other->value);
 
-        Node* other = current->next;
-        while(other) {
-            pthread_mutex_lock(&other->sync);
-
-            size_t len2 = strlen(other->value);
-            if (cmp(len1, len2)) {
-                cgp++;
-            }
-
-            pthread_mutex_unlock(&other->sync);
-            other = other->next;
+        if (cmp(len1, len2)) {
+            cgp++;
         }
-        pthread_mutex_unlock(&current->sync);
-        current = current->next;
+
+        pthread_spin_unlock(&current->sync);
+        current = other;
     }
+
+    pthread_spin_unlock(&current->sync);
     //printf("COUNT GOOD PAIR: %d \n", cgp);
 }
 
@@ -168,7 +208,6 @@ void* count_thread_func(void* args) {
     Arg* arg = (Arg*)args;
     CompareFunc compare = arg->cmp;
     while (1) {
-        sleep(1);
         count_good_pair(arg->list, compare);
 
         if (compare == less) {
@@ -179,6 +218,7 @@ void* count_thread_func(void* args) {
             iter_count_great++;
         }
     }
+    free(arg);
 }
 
 void destroy(Storage* list) {
@@ -195,7 +235,7 @@ void destroy(Storage* list) {
 }
 
 int main() {
-    Storage* list = init(10000);
+    Storage* list = init(1000);
     CompareFunc cmps[4];
     cmps[1] = less;
     cmps[2] = great;
@@ -203,6 +243,7 @@ int main() {
 
     pthread_t tid[7];
     int err;
+    
     for (int i = 0; i < 3; i++) {
         err = pthread_create(&tid[i], NULL, swap_thread_func, list);
         if (err) {
@@ -219,7 +260,8 @@ int main() {
         if (err) {
             printf("main: pthread_create() failed: %s\n", strerror(err));
             return -1;
-        }	
+        }
+	
     }
 
     err = pthread_create(&tid[6], NULL, monitor, list);
@@ -227,8 +269,9 @@ int main() {
             printf("main: pthread_create() failed: %s\n", strerror(err));
             return -1;
         }	
+    
 
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 6; i++) {
         pthread_join(tid[i], NULL);
     }
     
