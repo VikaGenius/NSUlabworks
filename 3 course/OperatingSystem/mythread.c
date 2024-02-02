@@ -164,7 +164,6 @@ int main() {
     printf("main [%d %d %d]\n", getpid(), getppid(), gettid());
 
     mythread_create(&tid, mythread_func, "hello from main");
-    sleep(10);
     mythread_join(tid, &retval);
 
     printf("main [%d %d %d] thread returned '%s'\n", getpid(), getppid(), gettid(), (char*)retval);
