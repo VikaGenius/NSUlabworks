@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <netdb.h>
+#include <errno.h>
 
 #define MAX_BUFFER_SIZE 1024 * 4
 
@@ -112,10 +113,12 @@ void handle_client(int client_socket) {
     int server_socket = connect_and_get_server_socket(host);
 
     if (send(server_socket, buffer, bytes_received, 0) < 0) {
-        perror("Ошибка при отправке данных на сервер");
-        close(client_socket);
-        close(server_socket);
-        return;
+        if (errno != EINTR) {
+            perror("Ошибка при отправке данных на сервер");
+            close(client_socket);
+            close(server_socket);
+            return;
+        }
     }
 
     // получаем данные от сервера и пересылаем их клиенту
