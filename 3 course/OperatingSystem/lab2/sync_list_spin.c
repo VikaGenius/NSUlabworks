@@ -113,13 +113,6 @@ void random_nodes_swap(Storage* list) {
         pthread_spin_unlock(&list->sync_list);
         pthread_spin_unlock(&second->sync);
 
-    } else {
-        if (first->next) {
-            pthread_spin_lock(&first->next->sync);
-            list->head = first->next;
-            pthread_spin_unlock(&first->next->sync);
-        }
-        pthread_spin_unlock(&list->sync_list);
     }
     
     Node* third = NULL;
