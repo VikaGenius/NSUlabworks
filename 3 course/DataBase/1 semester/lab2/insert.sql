@@ -1,0 +1,81 @@
+INSERT INTO Category (category_name, necessity) VALUES
+  ('Процессор', 'Обязательна'),
+  ('Материнская плата', 'Обязательна'),
+  ('Оперативная память', 'Обязательна'),
+  ('Жесткий диск', 'Обязательна'),
+  ('Видеокарта', 'Необязательна'),
+  ('Блок питания', 'Обязательна'),
+  ('Корпус', 'Обязательна'),
+  ('Системное охлаждение', 'Необязательна'),
+  ('Звуковая карта', 'Необязательна'),
+  ('Сетевая карта', 'Необязательна'),
+  ('Оптический привод', 'Необязательна'),
+  ('Компьютерная мышь', 'Необязательна'),
+  ('Клавиатура', 'Необязательна'),
+  ('Монитор', 'Необязательна');
+
+INSERT INTO Components (component_name, category_id, price, warranty_period) VALUES
+  ('Процессор Intel Core i7-10700K', 1, (500 + floor(random() * 9501)), '1 year'),
+  ('Материнская плата ASUS ROG Strix B450-F', 2, (500 + floor(random() * 9501)), '2 years'),
+  ('Оперативная память Corsair Vengeance LPX 16GB', 3, (500 + floor(random() * 9501)), '3 years'),
+  ('Жесткий диск Samsung 860 EVO 500GB', 4, (500 + floor(random() * 9501)), '4 years'),
+  ('Видеокарта NVIDIA GeForce RTX 3080', 5, (500 + floor(random() * 9501)), '5 years'),
+  ('Блок питания EVGA 850 BQ', 6, (500 + floor(random() * 9501)), '6 years'),
+  ('Корпус NZXT H510', 7, (500 + floor(random() * 9501)), '7 years'),
+  ('Системное охлаждение Cooler Master Hyper 212', 8, (500 + floor(random() * 9501)), '8 years'),
+  ('Звуковая карта Creative Sound Blaster', 9, (500 + floor(random() * 9501)), '9 years'),
+  ('Сетевая карта TP-Link Archer C7', 10, (500 + floor(random() * 9501)), '10 years'),
+  ('Монитор LG 27GL83A-B', 12, (500 + floor(random() * 9501)), '1 year'),
+  ('Беспроводная мышь Logitech G Pro Wireless', 12, (500 + floor(random() * 9501)), '2 years'),
+  ('Процессор Intel Core i5-9600K', 1, (500 + floor(random() * 9501)), '1 year'),
+  ('Материнская плата MSI B450 TOMAHAWK', 2, (500 + floor(random() * 9501)), '2 years'),
+  ('Оперативная память Kingston HyperX Fury 8GB', 3, (500 + floor(random() * 9501)), '3 years'),
+  ('Жесткий диск Seagate Barracuda 2TB', 4, (500 + floor(random() * 9501)), '4 years'),
+  ('Видеокарта AMD Radeon RX 570', 5, (500 + floor(random() * 9501)), '5 years'),
+  ('Блок питания Corsair CX550M', 6, (500 + floor(random() * 9501)), '6 years'),
+  ('Корпус Fractal Design Meshify C', 7, (500 + floor(random() * 9501)), '7 years'),
+  ('Системное охлаждение NZXT Kraken X52', 8, (500 + floor(random() * 9501)), '8 years'),
+  ('Звуковая карта ASUS Xonar DGX', 9, (500 + floor(random() * 9501)), '9 years');
+
+INSERT INTO Computers (serial_number, vendor_id) VALUES
+  ('AB123456', 1),
+  ('CD789012', 2),
+  ('EF345678', 3),
+  ('GH901234', 1),
+  ('IJ567890', 2),
+  ('KL123456', 4),
+  ('MN789012', 1),
+  ('OP345678', 2),
+  ('QR901234', 3);
+
+INSERT INTO Computers_components (serial_number, component_id, date_sale_component, price_computer) VALUES
+  ('AB123456', 1, '2023-11-06', (10000 + floor(random() * 40001))),
+  ('AB123456', 2, '2023-11-06', (10000 + floor(random() * 40001))),
+  ('AB123456', 3, '2023-11-06', (10000 + floor(random() * 40001))),
+  ('CD789012', 4, '2023-11-07', (10000 + floor(random() * 40001))),
+  ('CD789012', 5, '2023-11-07', (10000 + floor(random() * 40001))),
+  ('CD789012', 6, '2023-11-07', (10000 + floor(random() * 40001))),
+  ('EF345678', 7, '2023-11-08', (10000 + floor(random() * 40001))),
+  ('EF345678', 8, '2023-11-08', (10000 + floor(random() * 40001))),
+  ('EF345678', 9, '2023-11-08', (10000 + floor(random() * 40001))),
+  ('GH901234', 10, '2023-11-09', (10000 + floor(random() * 40001))),
+  ('GH901234', 11, '2023-11-09', (10000 + floor(random() * 40001)));
+
+INSERT INTO Computers_components (serial_number, component_id, date_sale_component, price_computer) VALUES
+  ('GH901234', 12, '2023-11-09', (10000 + floor(random() * 40001))),
+  ('IJ567890', 13, '2023-11-10', (10000 + floor(random() * 40001))),
+  ('IJ567890', 14, '2023-11-10', (10000 + floor(random() * 40001))),
+  ('IJ567890', 15, '2023-11-10', (10000 + floor(random() * 40001))),
+  ('KL123456', 16, '2023-11-11', (10000 + floor(random() * 40001))),
+  ('KL123456', 17, '2023-11-11', (10000 + floor(random() * 40001))),
+  ('KL123456', 18, '2023-11-11', (10000 + floor(random() * 40001))),
+  ('MN789012', 19, '2023-11-12', (10000 + floor(random() * 40001))),
+  ('MN789012', 20, '2023-11-12', (10000 + floor(random() * 40001))),
+  ('MN789012', 1, '2023-11-12', (10000 + floor(random() * 40001))),
+  ('OP345678', 2, '2023-11-13', (10000 + floor(random() * 40001))),
+  ('OP345678', 3, '2023-11-13', (10000 + floor(random() * 40001))),
+  ('OP345678', 4, '2023-11-13', (10000 + floor(random() * 40001))),
+  ('QR901234', 5, '2023-11-14', (10000 + floor(random() * 40001))),
+  ('QR901234', 6, '2023-11-14', (10000 + floor(random() * 40001))),
+  ('QR901234', 7, '2023-11-14', (10000 + floor(random() * 40001)));
+

@@ -1,0 +1,50 @@
+program = ws decl*:d ws body:b ws { Program(:d, :b) };
+
+decl = ws "VAR" ws variable:v ws ":" ws type:t ";" ws { Decl(:v, :t) };
+
+type = typeArray | typeInt;
+
+typeArray = ws "[" ws type:t ws "]" { TypeArray(:t) };
+typeInt = "INT" { TypeInt() };
+
+body = test | assignment | nonDeterministicIteration | sequence  | nonDeterministicChoice;
+
+test = ws "(" ws compOp:cond ws ")" ws "?" ws ";" { Test(:cond) };
+assignment = ws variable:var ws ":=" ws expr:exp ws ";" { Assignment(:var, :exp) };
+sequence = "{" ws newBody+:b ws "}" { Sequence(:b) };
+nonDeterministicIteration = ws "{" ws newBody+:b ws "}*" { NonDetIter(:b) };
+nonDeterministicChoice = ws "{" ws body:head ws tailForNonDetChoice+:tail ws "}" ws { NonDetChoice(:head, :tail) };
+tailForNonDetChoice = ws "U" ws body:tail { :tail };
+newBody = ws body:b ws { :b };
+
+expr = arrayOp | arithOp | variable | int;
+
+arithOp = sum | sub | mul | div | int | variable;
+compOp = greaterThan | greaterThanOrEqual | lessThan | lessThanOrEqual | equality | notEquality | not;
+
+sum = "(" ws arithOp:l ws "+" ws arithOp:r ws ")" { Sum(:l, :r) };
+sub = "(" ws arithOp:l ws "-" ws arithOp:r ws ")" { Sub(:l, :r) };
+mul = "(" ws arithOp:l ws "*" ws arithOp:r ws ")" { Mult(:l, :r) };
+div = "(" ws arithOp:l ws "/" ws arithOp:r ws ")" { Div(:l, :r) };
+
+greaterThan = ws arithOp:l ws ">" ws arithOp:r ws { GreaterThan(:l, :r) };
+greaterThanOrEqual = ws arithOp:l ws ">=" ws arithOp:r ws { GreaterThanOrEqual(:l, :r) };
+lessThan = ws arithOp:l ws "<" ws arithOp:r ws { LessThan(:l, :r) };
+lessThanOrEqual = ws arithOp:l ws "<=" ws arithOp:r ws { LessThanOrEqual(:l, :r) };
+equality = ws arithOp:l ws "==" ws arithOp:r ws { Equality(:l, :r) };
+notEquality = ws arithOp:l ws "!=" ws arithOp:r ws { NotEquality(:l, :r) };
+not = "NOT" ws "(" ws compOp:v ws ")" { Not(:v) };
+
+arrayOp = upd | app | array | variable;
+upd = "UPD" ws "(" ws arrayOp:arr ws "," ws arithOp:index ws "," ws expr:value ws ")" { Upd(:arr, :index, :value) };
+app = "APP" ws "(" ws arrayOp:arr ws "," ws arithOp:index ws ")" { App(:arr, :index) };
+
+array = ws "[" ws int:head ws newElemnt*:tail ws "]" { Array(:head, :tail)};
+newElemnt = ws ',' ws int:tail { :tail };
+int = digit+ $s { Int(s2i($s)) };
+variable = (letter + (letter | digit)*) $s { Var($s) };
+
+digit = '0'-'9';
+letter = 'a'-'z' | 'A'-'Z' | '_';
+
+ws = (' ' | '\t' | '\r' | '\n')*;

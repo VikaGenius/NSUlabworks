@@ -1,0 +1,54 @@
+import lingo/pegcode/driver;
+import string;
+
+export {
+    Program(decls: [Decl], body: Body);
+    Decl(var: Var, type: Type);
+    Body ::= Test, Assignment, Sequence, NonDetChoice, NonDetIter;
+        Assignment(variable: Var, expr: Expr);
+        Sequence(body: [Body]);
+        Test(cond: CompOp);
+        NonDetChoice(head: Body, tail: [Body]);
+        NonDetIter(body: [Body]);
+    
+    Type ::= TypeArray, TypeInt;
+        TypeArray(t: Type);
+        TypeInt();
+
+    Expr ::= ArithOp, ArrayOp;
+
+    CompOp ::= GreaterThan, GreaterThanOrEqual, LessThan, LessThanOrEqual, Equality, NotEquality, Not;
+        GreaterThan(left: ArithOp, right: ArithOp);
+        GreaterThanOrEqual(left: ArithOp, right: ArithOp);
+        LessThan(left: ArithOp, right: ArithOp);
+        LessThanOrEqual(left: ArithOp, right: ArithOp);
+        Equality(left: ArithOp, right: ArithOp);
+        NotEquality(left: ArithOp, right: ArithOp);
+        Not(expr: CompOp);
+    
+    ArithOp ::= Sum, Sub, Mult, Div, Var, Int;
+        Sum(left: ArithOp, right: ArithOp);
+        Sub(left: ArithOp, right: ArithOp);
+        Mult(left: ArithOp, right: ArithOp);
+        Div(left: ArithOp, right: ArithOp);
+        Var(name: string);
+        Int(value: int);
+
+    ArrayOp ::= Upd, App, Array, Var;
+        Array(head: Int, tail: [Int]);
+        App(array: ArrayOp, index: ArithOp);
+        Upd(array: ArrayOp, index: ArithOp, value: ArithOp);
+
+    parser(str: string) -> Program;
+}
+
+parser(str: string) -> Program {
+    e_gr = "#include grammar1.lingo";
+    parsic(
+        compilePegGrammar(e_gr),
+        str,
+        defaultPegActions
+    );
+}
+
+

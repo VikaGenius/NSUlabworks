@@ -1,0 +1,83 @@
+import string;
+import parser1;
+
+export {
+    prog2s(prog: Program) -> string;
+    type2s(type: Type) -> string;
+    decls2s(decls: [Decl]) -> string;
+    body2s(Body) -> string;
+    expr2s(expr: Expr) -> string;
+    arith2s(expr: ArithOp) -> string;
+    condOp2s(expr: CompOp) -> string;
+}
+
+prog2s(prog: Program) {
+    decls2s(prog.decls) + body2s(prog.body)
+}
+
+decls2s(decls: [Decl]) {
+    strGlue(map(decls, decl2s), "\n"); 
+}
+
+decl2s(decl: Decl) {
+    "VAR " + decl.var.name + " : " + type2s(decl.type) + "; ";
+}
+
+type2s(type: Type) {
+    switch (type) {
+		TypeInt(): "INT";
+		TypeArray(t): "[" + type2s(t) + "]";
+	}
+}
+
+body2s(body: Body) {
+    switch(body) {
+        Assignment(var, expr): var.name + " := " + expr2s(expr);
+        Test(cond) : "(" + condOp2s(cond) + ")? ";
+        Sequence(b) : "{\n" + strGlue(map(b, body2s), ";\n") + "\n}\n";
+        NonDetChoice(h, t): "{" + strGlue(map(concat([h], t), body2s), " U ") + "}\n";
+        NonDetIter(b): "{\n" + strGlue(map(b, body2s), ";\n") + "}*\n";
+    }
+}
+
+expr2s(expr: Expr) {
+    switch (expr) {
+        Int(value): i2s(value);
+        Var(name): name;
+        ArrayOp(): arrayOp2s(expr);
+        ArithOp(): arith2s(expr);
+    }
+}
+
+arith2s(expr: ArithOp) {
+    switch (expr) {
+        Sum(left, right):  "(" + arith2s(left) + " + " + arith2s(right) + ")";
+        Sub(left, right):  "(" + arith2s(left) + " - " + arith2s(right) + ")";
+        Mult(left, right): "(" + arith2s(left) + " * " + arith2s(right) + ")";
+        Div(left, right):  "(" + arith2s(left) + " / " + arith2s(right) + ")";
+        Var(name): name
+        Int(value): i2s(value);
+    }
+    
+}
+
+condOp2s(expr: CompOp) {
+    switch (expr) {
+        GreaterThan(left, right):        "(" + arith2s(left) + " > " + arith2s(right ) + ")"
+        GreaterThanOrEqual(left, right): "(" + arith2s(left) + " >= " + arith2s(right ) + ")"
+        LessThan(left, right):           "(" + arith2s(left) + " < " + arith2s(right ) + ")"
+        LessThanOrEqual(left, right):    "(" + arith2s(left) + " <= " + arith2s(right ) + ")"
+        Equality(left, right):           "(" + arith2s(left) + " == " + arith2s(right ) + ")"
+        NotEquality(left, right):        "(" + arith2s(left) + " != " + arith2s(right ) + ")"
+        Not(value): "NOT(" + condOp2s(value) + ")"
+    }
+}
+
+arrayOp2s(expr: ArrayOp) {
+    switch(expr) {
+        Array(h, t): "[" + strGlue(concat([i2s(h.value)], map(t, \intV -> i2s(intV.value))), ", ") + "]";
+        App(array, index): "APP(" + arrayOp2s(array) + ", " + arith2s(index) + ")";
+        Upd(array, index, value): "UPD(" + arrayOp2s(array) + ", " + arith2s(index) + ", " + arith2s(value) + ")";
+        Var(name): name;
+    }
+}

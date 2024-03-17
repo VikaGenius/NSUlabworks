@@ -1,0 +1,72 @@
+import lingo/pegcode/driver;
+
+export {
+    ArExpr ::= ArSum, ArMult, ArInt;
+            ArSum(left: ArExpr, right : ArExpr);
+            ArMult(left: ArExpr, right : ArExpr);
+            ArInt(val : int);
+            
+}
+
+s2ar(str : string) -> ArExpr {
+    e_gr = "#include grammar.lingo";
+    parsic(
+        compilePegGrammar(e_gr),
+        str,
+        SemanticActions(setTree(defaultPegActions.t, "createArInt", \s -> ArInt(s2i(s[0]))))
+    )
+}
+
+Push(stack : ref[int], val : int) {
+    refArrayPush(stack, val);
+}
+
+Pop(stack : ref [int]) -> int {
+   a : int = lastElement(^stack, 0);
+   stack := subrange(^stack, 0, length(^stack) - 1); 
+   a;
+}
+
+t2polish_arr_s(exp: ArExpr) -> [string] {
+    switch (exp) {
+        ArInt(val) : [i2s(val)];
+        ArSum(left, right) : concat(concat(t2polish_arr_s(left), t2polish_arr_s(right)), ["+"]);
+        ArMult(left, right) : concat(concat(t2polish_arr_s(left), t2polish_arr_s(right)), ["*"]);
+    }
+}
+
+t2polish_s(exp: ArExpr) -> string {
+    switch(exp) {
+        ArInt(val) : i2s(val);
+        ArSum(left, right) : t2polish_s(left) + " " + t2polish_s(right) + " " + "+";
+        ArMult(left, right) : t2polish_s(left) + " " + t2polish_s(right) + " " + "*";
+    }
+}
+
+calculate(exp: [string]) -> int {
+    res = fold(exp, ref[], \stack, f -> {
+        if (f == "+") {
+            a = Pop(stack);
+            b = Pop(stack);
+            Push(stack, a + b);
+        } else if (f == "*") {
+            a = Pop(stack);
+            b = Pop(stack);
+            Push(stack, a * b);
+        }
+        else {
+            Push(stack, s2i(f));
+        }
+        stack;
+    });
+    Pop(res);
+}
+
+
+
+main () {
+    str = "(((2 + 3) + 6) * 3)";
+    par = t2polish_arr_s(s2ar(str));
+    println("Exp in polish: " + t2polish_s(s2ar(str)));
+    println("Result of exp: " + i2s(calculate(par)));
+}

@@ -1,0 +1,13 @@
+S = sum | mul | sub | div | int | neg | var;
+sum = "(" ws S:l ws "+" ws S:r ws ")" { ArSum(:l, :r) };
+mul = "(" ws S:l ws "*" ws S:r ws ")" { ArMult(:l, :r)};
+sub = "(" ws S:l ws "-" ws S:r ws ")" { ArSub(:l, :r)};
+div = "(" ws S:l ws "/" ws S:r ws ")" { ArDiv(:l, :r)};
+neg =  ws "-" ws S:e { ArNeg(:e) };
+
+var = letter+ $l { Var($l) };
+int = digit+ $s { ArInt (s2i($s)) };
+
+digit = '0'-'9';
+letter = 'a' - 'z';
+ws = ( ' ' | '\t' | '\n' | '\r' )*;

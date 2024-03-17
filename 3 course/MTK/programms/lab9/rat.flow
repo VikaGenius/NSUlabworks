@@ -1,0 +1,317 @@
+import lingo/pegcode/driver;
+import string;
+
+export {
+    ArExpr::= ArSum, ArMult, ArInt, ArDiv, ArSub, ArNeg, Var;
+            ArSum(left: ArExpr, right: ArExpr);
+            ArMult(left: ArExpr, right: ArExpr);
+            ArSub(left: ArExpr, right: ArExpr);
+            ArDiv(left: ArExpr, right: ArExpr);
+            ArInt(val: int);
+            ArNeg(val: ArExpr); 
+            Var(name: string);
+            //Rat(num: ArExpr, denom: ArExpr);
+}
+
+//моном, хранит переменные, их степень и числовой коэффициент монома
+Mon(vars: Tree<string, int>, coef: ref int);
+
+s2ar(str: string) -> ArExpr {
+    e_gr = "#include grammar.lingo";
+    parsic(
+        compilePegGrammar(e_gr),
+        str,
+        SemanticActions(setTree(defaultPegActions.t, "createArInt", \s -> ArInt(s2i(s[0]))))
+    )
+}
+
+//получаем все мономы в массив, чтобы потом сложить
+collectMon(exp: ArExpr) -> [Mon] {
+    switch (exp) {
+        ArMult(left, right): concat([], [buildMon(ArMult(left, right))]);
+        ArSum(left, right): concat(collectMon(left), collectMon(right));
+        ArInt(val): concat([], [buildMon(ArInt(val))]);
+        ArNeg(val): {
+            arr = map(collectMon(val), \mon -> {
+                newCoef: ref int = mon.coef;
+                newCoef := ^(newCoef) * (-1);
+                Mon(mon.vars, newCoef);
+            });
+            concat([], arr);
+        }; //вот тут добавить рекурсию возможно
+        Var(val): concat([], [buildMon(Var(val))]);
+        default: [];
+    }
+}
+
+//передаем сюда поддерево с умножением - моном, который еще в рекурсивном виде
+buildMon(root: ArExpr) -> Mon {
+    switch(root) {
+        Var(name): {
+            tre = makeTree();
+            tree = setTree(tre, name, 1);
+            Mon(tree, ref 1);
+        }
+        ArInt(val): {
+            Mon(makeTree(), ref val);
+        }
+        ArNeg(val): {
+            //спускаемся рекурсивно
+            vars: ref Tree = ref makeTree();
+            coef: ref int = ref 1;
+            passTreeForGetMon(ArNeg(val), vars, coef);
+            Mon(^vars, coef);
+        }
+        ArMult(left, right): {
+            //спускаемся рекурсивно
+            vars: ref Tree = ref makeTree();
+            coef: ref int = ref 1;
+            passTreeForGetMon(ArMult(left, right), vars, coef);
+            Mon(^vars, coef);
+        }
+        default: Mon(makeTree(), ref 0);    
+    } 
+}
+
+//обходим дерево для получения монома
+passTreeForGetMon(exp: ArExpr, vars: ref Tree, coef: ref int) {
+    switch(exp) {
+        ArMult(left, right): {
+            passTreeForGetMon(left, vars, coef);
+            passTreeForGetMon(right, vars, coef);
+        }
+        ArNeg(val): {
+            coef := ^coef * (-1);
+            passTreeForGetMon(val, vars, coef);
+        }
+        ArInt(val): coef := ^coef * val;
+        Var(name): vars := setTree(^vars, name, lookupTreeDef(^vars, name, 0) + 1);
+
+        default: {}
+    }
+}
+
+tree2s(tr: Tree<string, int>) -> string {
+    pairs = tree2pairs(tr);
+    fold(subrange(pairs, 1, length(pairs) - 1), pair2s(pairs[0]), \res, pair -> {
+        if (pair.second == 0) {
+            res;
+        } else if (strIndexOf(pair2s(pair), "-") == -1) {
+            res + "+" + pair2s(pair);
+        } else {
+           res + pair2s(pair);
+        }
+    });
+}
+
+pair2s(pair: Pair<string, int>) -> string {
+    if (pair.second == 1) {
+        if (pair.first != "") {
+            pair.first;
+        } else {
+            i2s(pair.second);
+        }
+    } else if (pair.second == 0) {
+        "0";
+    } else {
+        i2s(pair.second) + pair.first;
+    }
+}
+
+arr2tree(monomials: [Mon]) -> Tree<string, int> {
+    //получаем массив пар (строка - моном, коэфф) вместо массивов мономов = (дерево - моном, коэф)
+    monomialsPair = map(monomials, \m -> tree2pair(m));
+
+    //добавляем первую пару (моном, коэф) в дерево, чтобы потом сравнивать с ним
+    //если мономы при сравнении совпадают, прибавляем коэф того, с которым сравниваем, к его коэф
+    //если отличаются, добавляем в наше дерево новый элемент. таким образом получаем дерево с уникальными мономами
+    tree : ref Tree<string, int> = ref setTree(makeTree(), monomialsPair[0].first, monomialsPair[0].second);
+    pairsWithoutFirst = subrange(monomialsPair, 1, length(monomialsPair) - 1);
+    map(pairsWithoutFirst, \m -> {
+        tree := setTree(^tree, m.first, lookupTreeDef(^tree, m.first, 0) + m.second);
+    });
+
+    ^tree;
+}
+
+tree2pair(mon: Mon) -> Pair<string, int> {
+    sortedPairsVarsInMonomial = mergeSort(tree2pairs(mon.vars), \a, b -> { if (a.first > b.first) {1} else if (a < b) {-1} else {0}; });
+    k = fold(sortedPairsVarsInMonomial, "", \key, p -> {
+        if (p.second == 1) {
+            key + p.first;
+        } else {
+            key + p.first + "^" + i2s(p.second);
+        }
+    });
+
+    Pair(k, ^(mon.coef));
+}
+
+//избавляемся от Sub чтобы было удобно считать впоследствии
+restruct(exp: ArExpr) -> ArExpr {
+    switch(exp) {
+        ArMult(left, right): ArMult(restruct(left), restruct(right));
+        ArSum(left, right): ArSum(restruct(left), restruct(right));
+        ArSub(left, right): ArSum(restruct(left), ArNeg(restruct(right)));
+        ArInt(val): ArInt(val);
+        ArNeg(val): ArNeg(restruct(val));
+        Var(name): Var(name);
+
+        default: ArInt(0);
+    }
+}
+
+calcRat(exp: ArExpr) -> ArDiv {
+    switch(exp) {
+        ArSum(left, right): {
+            lexp = calcRat(left);
+            rexp = calcRat(right);
+
+            ArDiv(ArSum(ArMult(lexp.left, rexp.right), simpArMult(rexp.left, lexp.right)), simpArMult(lexp.right, rexp.right));
+        }
+        ArMult(left, right): {
+            lexp = calcRat(left);
+            rexp = calcRat(right);
+            
+            ArDiv(simpArMult(lexp.left, rexp.left), simpArMult(lexp.right, rexp.right));
+        }
+        ArSub(left, right): {
+            lexp = calcRat(left);
+            rexp = calcRat(right);
+
+            ArDiv(ArSub(simpArMult(lexp.left, rexp.right), simpArMult(rexp.left, lexp.right)), simpArMult(lexp.right, rexp.right));
+        }
+        ArDiv(left, right): {
+            lexp = calcRat(left);
+            rexp = calcRat(right);
+
+            ArDiv(simpArMult(lexp.left, rexp.right), simpArMult(lexp.right, rexp.left));
+        }
+        ArNeg(val): {
+            val1 = calcRat(val);
+
+            ArDiv(ArNeg(val1.left), val1.right);
+        }
+        ArInt(val): ArDiv(ArInt(val), ArInt(1));
+        Var(name): ArDiv(Var(name), ArInt(1));
+        //Rat(num, denom): ;
+    }
+}
+
+openBrackets(exp: ArDiv) -> ArDiv {
+    expNum = exp.left;
+    expDenom = exp.right;
+    
+    ArDiv(handlePolinom(expNum), handlePolinom(expDenom)); 
+}
+
+simpArMult(left: ArExpr, right: ArExpr) -> ArExpr {
+    if (isArIntAndEqual(left, 0) || isArIntAndEqual(right, 0)) {
+        ArInt(0);
+    } else if (isArIntAndEqual(left, 1)) {
+        right;
+    } else if (isArIntAndEqual(right, 1)) {
+        left;
+    } else {
+        ArMult(left, right);
+    }       
+}
+
+handlePolinom(exp: ArExpr) -> ArExpr {
+    switch(exp) {
+        ArMult(left, right): {
+            if (isArSub(left)) {
+                lexp = cast(left: ArExpr -> ArSub);
+                handlePolinom(ArSub(simpArMult(handlePolinom(lexp.left), handlePolinom(right)), simpArMult(handlePolinom(lexp.right), handlePolinom(right))));
+            } else if (isArSub(right)) {
+                rexp = cast(right: ArExpr -> ArSub);
+                handlePolinom(ArSub(simpArMult(handlePolinom(rexp.left), handlePolinom(left)), simpArMult(handlePolinom(rexp.right), handlePolinom(left))));
+            } else if (isArSum(left)) {
+                lexp = cast(left: ArExpr -> ArSum);
+                handlePolinom(ArSum(simpArMult(handlePolinom(lexp.left), handlePolinom(right)), simpArMult(handlePolinom(lexp.right), handlePolinom(right))));
+            } else if (isArSum(right)) {
+                rexp = cast(right: ArExpr -> ArSum);
+                handlePolinom(ArSum(simpArMult(handlePolinom(rexp.left), handlePolinom(left)), simpArMult(handlePolinom(rexp.right), handlePolinom(left))));
+            } else {
+                simpArMult(handlePolinom(left), handlePolinom(right));
+            }
+        }
+        ArSum(left, right): ArSum(handlePolinom(left), handlePolinom(right));
+        ArSub(left, right): ArSub(handlePolinom(left), handlePolinom(right));
+        ArDiv(left, right): ArDiv(handlePolinom(left), handlePolinom(right));
+        ArNeg(val): ArNeg(handlePolinom(val));
+        ArInt(val): ArInt(val);
+        Var(name): Var(name);
+    }
+}
+
+//спасибо Юре за идею
+isArSub(ex: ArExpr) -> bool {
+    switch(ex) {
+        ArSub(left, right): true;
+        default: false;
+    }
+}
+
+isArSum(ex: ArExpr) -> bool {
+    switch(ex) {
+        ArSum(left, right): true;
+        default: false;
+    }
+}
+
+isArInt(ex: ArExpr) -> bool {
+    switch(ex) {
+        ArInt(val): true;
+        default: false;
+    }
+}
+
+isArIntAndEqual(ex: ArExpr, value: int) -> bool {
+    if (isArInt(ex)) {
+        cast(ex: ArExpr -> ArInt).val == value;
+    } else {
+        false;
+    }
+}
+
+rat2s(exp: ArExpr) -> string {
+    switch (exp) {
+        ArInt(val): i2s(val) ;
+        ArSum(left, right): "(" + rat2s(left) + " + " + rat2s(right) + ")";
+        ArMult(left, right): "(" + rat2s(left) + " * " + rat2s(right) + ")";
+        ArDiv(left, right): "(" + rat2s(left) + " / " + rat2s(right) + ")";
+        ArSub(left, right): "(" + rat2s(left) + " - " + rat2s(right) + ")";
+        ArNeg(val): "-" + rat2s(val);
+        Var(name): name;
+        //Rat(num, denom): "";
+    }
+}
+
+calcResult(str: string) -> string {
+    ratOpenedBrackets = openBrackets(openBrackets(calcRat(s2ar(str))));
+    num = restruct(ratOpenedBrackets.left);
+    denom = restruct(ratOpenedBrackets.right);
+
+    //println(rat2s(num));
+    //println(rat2s(denom));
+
+    monomialsArr1 = collectMon(num);
+    monomialsArr2 = collectMon(denom);
+
+    numPol = tree2s(arr2tree(monomialsArr1));
+    denomPol = tree2s(arr2tree(monomialsArr2));
+
+    result = "(" + numPol + ")" + "/" + "(" + denomPol + ")";
+    result;
+}
+
+main () {
+    //стресс-тесты
+    //str = "((((x - 6) / (6 * y)) / (((x * x) - (y * y)) / y)) * (((x * x) + ((2 * (x * y)) + (y * y))) / x))";
+    //str = "((((a + 1) / (7 * c)) * ((7 + (6 * c)) / x)) / ((3 * (a + 1)) / (x * x)))";
+    //str = "((((9 * (x * x)) - 4) / ((3 * x) + 2)) - (3 * x))";
+    str = "(((4 * (a * a)) - 9) * ((1 / ((2 * a) - 3)) - (1 / ((2 * a) + 3))))";
+
+    println(calcResult(str));
+}

@@ -1,0 +1,116 @@
+import string;
+import lingo/pegcode/driver;
+
+export {
+    ArExpr ::= ArSum, ArMult, ArInt, ArDiv, ArSub, ArNeg, Var, Rat;
+            ArSum(left: ArExpr, right : ArExpr);
+            ArMult(left: ArExpr, right : ArExpr);
+            ArSub(left: ArExpr, right : ArExpr);
+            ArDiv(left: ArExpr, right : ArExpr);
+            ArInt(val : int);
+            ArNeg(val : ArExpr); 
+            Var(name : string);
+            Rat(num : int, denom : int);
+}
+
+vars = [Pair("x", Rat(2, 4)), Pair("y", Rat(1, 2))];
+varTree = pairs2tree(vars);
+
+s2ar(str : string) -> ArExpr {
+    e_gr = "#include grammar2.lingo";
+    parsic(
+        compilePegGrammar(e_gr),
+        str,
+        SemanticActions(setTree(defaultPegActions.t, "createArInt", \s -> ArInt(s2i(s[0]))))
+    )
+}
+
+reduceFraction(rat: Rat) -> Rat {
+    nod = gcd(rat.num, rat.denom);
+    Rat(rat.num / nod, rat.denom / nod);
+}
+
+sumRat(left: Rat, right: Rat) -> Rat {
+    nok = lcm(left.denom, right.denom);
+    numerator = (left.num * (nok / left.denom)) + (right.num * (nok / right.denom));
+    denominator = nok;
+
+    reduceFraction(Rat(numerator, denominator));
+}
+
+subRat(left: Rat, right: Rat) -> Rat {
+    nok = lcm(left.denom, right.denom);
+    numerator = (left.num * (nok / left.denom)) - (right.num * (nok / right.denom));
+    denominator = nok;
+
+    reduceFraction(Rat(numerator, denominator));
+}
+
+multRat(left: Rat, right: Rat) -> Rat {
+    a = left.num;
+    b = left.denom;
+    c = right.num;
+    d = right.denom;
+
+    nod_bc = gcd(b, c);
+    nod_ad = gcd(a, d);
+    new_rat = Rat((a / nod_ad) * (c / nod_bc), (b / nod_bc) * (d / nod_ad));
+
+    reduceFraction(new_rat);
+}
+
+divRat(left: Rat, right: Rat) -> Rat {
+    if (right.num == 0) {
+        println("Error: division by zero\n");
+        quit(0);
+        Rat(0, 1);
+    } else {
+        new_rat2 = Rat(right.denom, right.num);
+        multRat(left, new_rat2);
+    }
+}
+
+negative(rat : Rat) -> Rat {
+    Rat((-1) * rat.num, rat.denom);
+}
+
+
+calculate(exp : ArExpr) -> Rat {
+    switch (exp) {
+        Var(name) : {
+            var = lookupTreeDef(varTree, name, Rat(1, 0));
+            if (var.denom == 0) {
+                println("Error: variable not found\n");
+                quit(0);
+                Rat(0, 1);
+            } else {
+                var;
+            }
+        }
+
+        Rat(num, denum) : reduceFraction(Rat(num, denum));
+        ArInt(val) : Rat(val, 1);
+        ArSum(left, right) : sumRat(calculate(left), calculate(right));
+        ArSub(left, right) : subRat(calculate(left), calculate(right));
+        ArMult(left, right) : multRat(calculate(left), calculate(right));
+        ArDiv(left, right) : divRat(calculate(left), calculate(right));
+        ArNeg(val) : negative(calculate(val));
+    }    
+}
+
+
+rat2s(rat : Rat) -> string {
+    if (rat.num == 0) {
+        "0";
+    } else if (rat.denom == 1) {
+        i2s(rat.num);
+    } else {
+        short_rat = reduceFraction(rat);
+        i2s(short_rat.num) + "/" + i2s(short_rat.denom);
+    }
+}
+
+main () {
+    str = "((2/3)+(1/3))";
+    println(rat2s(calculate(s2ar(str))));
+}

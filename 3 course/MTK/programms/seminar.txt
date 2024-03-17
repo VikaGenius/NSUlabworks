@@ -1,0 +1,53 @@
+Семинар №...
+
++ - повторение от 1 до сколько угодно раз
+? - 0 или 1
+* - от 0 до сколько угодно
+- - диапазон ("a"-"z")
+: - замена
+
+примеры
+---
+exp = int "+" exp | int;
+int = digit+;
+digit = '0'-'9';
+---
+порождает например 
+2
+2 + 3
+3 + 4 + 8
+
+-----
+exp = int:e1 "+" exp:e2 {Add(:e1, :e2)} | int:e { :e };
+int = digit + $d { Int(s2i($d)) };
+digit = '0'-'9';
+-----
+
+------
+S = sum | mul | int ;
+sum = "(" ws S:l ws "+" ws S:r ws ")" { ArSum(:l, :r) };
+mul = "(" ws S:l ws "*" S:r ws ")" { ArMult(:l, :r)};
+int = digit+ $s { ArInt (s2i($s)) };
+digit = '0'-'9';
+ws = ( ' ' | '\t' | '\n' | '\r' )*;
+------
+
+-------
+import lingo/pegcode/driver;
+
+export {
+    ArExpr ::= ArSum, ArMult, ArInt;
+            ArSum(lhs: AeExpr, rhs : ArExpt);
+            ArMult(lhs: AeExpr, rhs : ArExpt);
+            ArInt(val : int);
+}
+
+s2ar(str : string) -> ArExpr {
+    e_gr = "#include lingo/artih.lingo";
+    parsic(
+        compilePegGramar(e_gr),
+        str,
+        SemanticActions(setTree(defaultPegActions.t, "createArInt", \s -> ArInt(s2i(s[0]))))
+    )
+}
+

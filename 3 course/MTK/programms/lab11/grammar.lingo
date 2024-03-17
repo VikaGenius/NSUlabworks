@@ -1,0 +1,44 @@
+prog = ws decl+:vars ws body:b { Program(:vars, :b) };
+decl = ws "VAR" ws var:v ws ":" ws type:t ws ";" ws {VarDecl(:v, :t)};
+
+type = int | array;
+int = "INT" { INT() };
+array = "[" ws type:t ws "]" { ARRAY(:t) };
+
+val = number | arr;
+arr = "[" ws val*:v "]" { Arr(:v) };
+
+body = assignment | iteration | test | sequence | select;
+sequence = ws "{" ws body+:bodies ws "}" { Sequence(:bodies) }; 
+iteration = ws "{" ws body:b ws "}" ws "*" { Iter(:b) };
+test = ws "(" ws condition:cond ws ")" ws "?" { Test(:cond) };
+select = ws "{" ws body:begin ws variant+:end ws "}" { Select(:begin, :end) };
+variant = ws"U" ws body:b { :b };
+
+assignment = ws var:v ws ":=" ws expr:e ws ";" { Assign(:v, :e) };
+
+ar_expr = sum | sub | mul | div | var | number;
+sum = "(" ws expr:l ws "+" ws expr:r ws ")" { Sum(:l, :r) };
+sub = "(" ws expr:l ws "-" ws expr:r ws ")" { Sub(:l, :r) };
+mul = "(" ws expr:l ws "*" ws expr:r ws ")" { Mult(:l, :r) };
+div = "(" ws expr:l ws "/" ws expr:r ws ")" { Div(:l, :r) };
+
+array_op = val | app | upd;
+app = "APP" ws "(" ws var:v ws "," ws number:i ws ")" ws { APP(:v, :i) };
+upd = "UPD" ws "(" ws var:v ws "," ws number:i "," ws expr:value ws ")" ws { UPD (:v, :i, :value) };
+
+cond_expr = condition | expr;
+
+condition = not | less | more | eless | emore;
+not = "NOT" ws condition:e ws { Not(:e) };
+less = "(" ws cond_expr:l ws "<" ws cond_expr:r ws ")" { Less(:l, :r) };
+more = "(" ws cond_expr:l ws ">" ws cond_expr:r ws ")" { More(:l, :r) };
+eless = "(" ws cond_expr:l ws "<=" ws cond_expr:r ws ")" { LessEqual(:l, :r) };
+emore = "(" ws cond_expr:l ws ">=" ws cond_expr:r ws ")" { MoreEqual(:l, :r) };
+
+var = letter+ $l { Var($l) };
+number = digit+ $s { Int(s2i($s)) };
+
+digit = '0'-'9';
+letter = 'a' - 'z';
+ws = ( ' ' | '\t' | '\n' | '\r' )*;

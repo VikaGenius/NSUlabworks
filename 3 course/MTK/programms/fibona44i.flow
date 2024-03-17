@@ -1,0 +1,26 @@
+import string;
+
+arr2s(arr: [int]) -> string
+{
+    strGlue(map(arr, i2s), ",")
+}
+
+fibona44i(n: int) -> int {
+    if (n < 2) {
+        n;
+    } else {
+        fibona44i(n - 1) + fibona44i(n - 2);
+    }
+}
+
+algoritm(n: int) -> [int] {
+    arr: ref[int] = ref[];
+    fori(0, n, \i -> refArrayPush(arr, fibona44i(i)));
+    ^arr;
+}
+
+main()
+{
+    n = 3;
+    println("arr: " + arr2s(algoritm(n)));
+}

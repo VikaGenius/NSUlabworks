@@ -1,0 +1,208 @@
+import lingo/pegcode/driver;
+import string;
+
+export {
+    ArExpr::= ArSum, ArMult, ArDiv, ArSub, ArNeg, Var, Rat;
+            ArSum(left: ArExpr, right: ArExpr);
+            ArMult(left: ArExpr, right: ArExpr);
+            ArSub(left: ArExpr, right: ArExpr);
+            ArDiv(left: ArExpr, right: ArExpr);
+            ArNeg(val: ArExpr); 
+            Var(val: string);
+            Rat(num: int, denom: int);
+}
+
+replacement(from: ArExpr, to: ArExpr);
+
+parser(str: string) -> ArExpr {
+    e_gr = "#include grammar.lingo";
+    parsic(
+        compilePegGrammar(e_gr),
+        str,
+        defaultPegActions
+    );
+}
+
+makeReplacementsTree(replacements: [replacement]) -> Tree<ArExpr, ArExpr> {
+    fold(replacements, makeTree(), \acc, ident -> {
+        setTree(acc, ident.from, ident.to)
+        });
+}
+
+defoltVal(m: Maybe<?>, ifNone: ?) -> ? {
+    switch(m) {
+        Some(v): v;
+        None(): ifNone;
+    }
+}
+
+findReplacements(expr: ArExpr, replacementsTree: Tree<ArExpr, ArExpr>) -> ArExpr{
+    e = defoltVal(lookupTree(replacementsTree, expr), expr);
+    res = switch(e) {
+        ArSum(left, right): {
+            l = findReplacements(left, replacementsTree);
+            r = findReplacements(right, replacementsTree);
+
+            ArSum(l, r);
+        }
+        ArSub(left, right): {
+            l = findReplacements(left, replacementsTree);
+            r = findReplacements(right, replacementsTree);
+
+            ArSub(l, r);
+        }
+        ArMult(left, right): {
+            l = findReplacements(left, replacementsTree);
+            r = findReplacements(right, replacementsTree);
+
+            ArMult(l, r);
+        }
+        ArDiv(left, right): {
+            l = findReplacements(left, replacementsTree);
+            r = findReplacements(right, replacementsTree);
+
+            ArDiv(l, r);
+        }
+        ArNeg(val): {
+            v = findReplacements(val, replacementsTree);
+
+            ArNeg(v);
+        }
+        Rat(num, denom): defoltVal(lookupTree(replacementsTree, expr), Rat(num, denom));
+        Var(val): defoltVal(lookupTree(replacementsTree, expr), Var(val));
+    }
+
+    foldTree(replacementsTree, res, \ident, value, acc -> {
+        isMatch = findTemplates(ident, acc, makeTree());
+        isMatch ?? replaceVars(value, isMatch) : acc;
+    });
+}
+
+//заменяем переменные на нужные
+replaceVars(expr: ArExpr, vars: Tree<Var, ArExpr>) -> ArExpr {
+    switch(expr) {
+        Rat(num, denom): expr;
+        Var(val): defoltVal(lookupTree(vars, expr), expr);
+        ArSum(l, r): ArSum(replaceVars(l, vars), replaceVars(r, vars));
+        ArSub(l, r): ArSub(replaceVars(l, vars), replaceVars(r, vars));
+        ArDiv(l, r): ArDiv(replaceVars(l, vars), replaceVars(r, vars));
+        ArMult(l, r): ArMult(replaceVars(l, vars), replaceVars(r, vars));
+        ArNeg(val): {
+            var = replaceVars(val, vars);
+            switch(var) {
+                Rat(num, denom): ArNeg(var);
+                Var(v): ArNeg(var);
+                default: {
+                    ArNeg(Rat(1, 1));
+                }
+            }
+        }
+    }
+}
+
+//темплейт - выражение шаблона и по нему ищется выражение
+findTemplates(templ: ArExpr, expr: ArExpr, replacementsTree: Tree<Var, ArExpr>) -> Maybe<Tree<Var, ArExpr>> {
+    switch(templ) {
+        ArSum(left, right): {
+            switch(expr) {
+                ArSum(l, r): {
+                    match = findTemplates(left, l, replacementsTree);     
+                    match ?? findTemplates(right, r, match) : None();      
+                }                   
+                default: None();
+            }
+        }
+        ArSub(left, right): {
+            switch(expr) {
+                ArSub(l, r): {
+                    match = findTemplates(left, l, replacementsTree); 
+                    match ?? findTemplates(right, r, match) : None();  
+                }
+                default: None();
+            }
+        }
+        ArMult(left, right): {
+            switch(expr) {
+                ArMult(l, r): {
+                    match = findTemplates(left, l, replacementsTree); 
+                    match ?? findTemplates(right, r, match) : None();  
+                }
+                default: None();
+            }
+        }
+        ArDiv(left, right): {
+            switch(expr) {
+                ArDiv(l, r): {
+                    match = findTemplates(left, l, replacementsTree);
+                    match ?? findTemplates(right, r, match) : None();  
+                }
+                default: None();
+            }
+        }
+        Rat(num, denom): {
+            switch(expr) {
+                Rat(n1, d1): {
+                    if (templ == expr) {
+                        Some(replacementsTree);
+                    }
+                    else {
+                        None();
+                    }
+                }
+                default: None();
+            }
+        }
+        Var(var): {
+            val = lookupTree(replacementsTree, templ);
+            val ?? if (val == expr) Some(replacementsTree) else None() : Some(setTree(replacementsTree, templ, expr));
+        }
+        ArNeg(val): {
+            switch(expr) {
+                ArNeg(val2): findTemplates(val, val2, replacementsTree);
+                default: None();
+            }
+        }
+  }
+}
+
+exp2s(exp: ArExpr) -> string {
+    switch (exp) {
+        ArSum(left, right): "(" + exp2s(left) + " + " + exp2s(right) + ")";
+        ArMult(left, right): "(" + exp2s(left) + " * " + exp2s(right) + ")";
+        ArSub(left, right): "(" + exp2s(left) + " - " + exp2s(right) + ")";
+        ArDiv(left, right): "(" + exp2s(left) + " / " + exp2s(right) + ")";
+        ArNeg(val): "(-" + exp2s(val) + ")";
+        Var(val): val;
+        Rat(num, denom): {
+            if (denom == 1) {
+                i2s(num);
+            }
+            else if (num == 0 && denom != 0){
+                i2s(0);
+            }
+            else if (denom == 0) {
+                "Error! Division by zero!";
+            }
+            else {
+                i2s(num)+ "/" + i2s(denom);
+            }
+        }
+    }
+}
+
+main() {
+    replacements = [
+        replacement(parser("((x * x) - (y * y))"), parser("((x + y) * (x - y))")),
+        replacement(parser("--x"), parser("x"))
+    ];
+
+    //str = "(((x * x) - (y * y)) / ((x * x) - (y * y)))";
+    //str = "--x";
+    str = "((x * x) - (y * y))";
+    println("Before: " + str);
+
+    expr = parser(str);
+    
+    res = findReplacements(expr, makeReplacementsTree(replacements));
+    println("After: " + exp2s(res));
+}

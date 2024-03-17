@@ -1,0 +1,134 @@
+import string;
+import lingo/pegcode/driver;
+
+export {
+    ArExpr ::= ArSum, ArMult, ArInt, ArDiv, ArSub, ArNeg, Var, Rat;
+            ArSum(left: ArExpr, right : ArExpr);
+            ArMult(left: ArExpr, right : ArExpr);
+            ArSub(left: ArExpr, right : ArExpr);
+            ArDiv(left: ArExpr, right : ArExpr);
+            ArInt(val : int);
+            ArNeg(val : ArExpr); 
+            Var(name : string);
+            Rat(num : int, denom : int);
+}
+
+s2ar(str : string) -> ArExpr {
+    e_gr = "#include grammar.lingo";
+    parsic(
+        compilePegGrammar(e_gr),
+        str,
+        SemanticActions(setTree(defaultPegActions.t, "createArInt", \s -> ArInt(s2i(s[0]))))
+    )
+}
+
+reduceFraction(rat: Rat) -> Rat {
+    nod = gcd(rat.num, rat.denom);
+    Rat(rat.num / nod, rat.denom / nod);
+}
+
+calculateDerivative(exp: ArExpr, variable : string) -> ArExpr {
+    switch (exp) {
+        Var(name) : {
+            if (variable == name) {
+                Rat(1, 1);
+            } else {
+                Rat(0, 1);
+            }
+        }
+
+        Rat(num, denum) : ArInt(0);
+        ArInt(val) : ArInt(0);
+        ArSum(left, right) : ArSum(calculateDerivative(left, variable), calculateDerivative(right, variable));
+        ArSub(left, right) : ArSub(calculateDerivative(left, variable), calculateDerivative(right, variable));
+        ArMult(left, right) : {
+            lder = calculateDerivative(left, variable);
+            rder = calculateDerivative(right, variable);
+            ArSum(ArMult(lder, right), ArMult(rder, left));
+        }
+        ArDiv(left, right) :  {
+            lder = calculateDerivative(left, variable);
+            rder = calculateDerivative(right, variable);
+            ArDiv(ArSub(ArMult(lder, right), ArMult(rder, left)), ArMult(right, right));
+        }
+        ArNeg(val) : ArNeg(calculateDerivative(val, variable));
+    }  
+}
+
+ex2s(exp : ArExpr) -> string {
+    switch (exp) {
+        Var(name) : name;
+        Rat(num, denum) : rat2s(reduceFraction(Rat(num, denum)));
+
+        ArSum(left, right) : {
+            if (ex2s(left) == "0") {
+                ex2s(right);
+            } else if (ex2s(right) == "0") {
+                ex2s(left);
+            } else {
+                "(" + ex2s(left) + " + " + ex2s(right) + ")";
+            }
+        }
+
+        ArSub(left, right) : {
+            if (ex2s(left) == "0") {
+                ex2s(ArNeg(right));
+            } else if (ex2s(right) == "0") {
+                ex2s(left);
+            } else {
+                "(" + ex2s(left) + " - " + ex2s(right) + ")";
+            }
+        }
+
+        ArMult(left, right) : {
+            if (ex2s(left) == "1") {
+                ex2s(right);
+            } else if (ex2s(right) == "1") {
+                ex2s(left);
+            } else if (ex2s(left) == "0" || ex2s(right) == "0"){
+                "0";
+            } else {
+                "(" + ex2s(left) + " * " + ex2s(right) + ")";
+            }
+        }
+
+        ArDiv(left, right) : {
+            if (ex2s(right) == "1") {
+                ex2s(left);
+            } else if (ex2s(left) == "0") {
+                "0";
+            } else if (ex2s(right) == "0") {
+                println("Error: division by zero\n");
+                quit(0);
+                "";
+            } else {
+                "(" + ex2s(left) + " / " + ex2s(right) + ")";
+            }
+        }
+
+        ArNeg(val) : {
+            if (ex2s(val) == "0") {
+                "0";
+            } else {
+                "(" + "-" + ex2s(val) + ")";  
+            }
+        }
+        ArInt(val) : i2s(val);
+    }
+}
+
+rat2s(rat : Rat) -> string {
+    if (rat.num == 0) {
+        "0";
+    } else if (rat.denom == 1) {
+        i2s(rat.num);
+    } else {
+        short_rat = reduceFraction(rat);
+        "(" + i2s(short_rat.num) + " / " + i2s(short_rat.denom) + ")";
+    }
+}
+
+main () {
+    str = "(1/x)";
+    println(ex2s(calculateDerivative(s2ar(str), "x")));
+}

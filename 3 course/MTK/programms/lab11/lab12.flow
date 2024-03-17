@@ -1,0 +1,308 @@
+import ds/tree;
+import string;
+import lingo/pegcode/driver;
+import parser1;
+import nemo2s;
+
+VmProgram(declarations: [Decl], operators: [Operators]);
+    
+Value ::= IntValue, ArrayValue;
+    IntValue(v: int);
+    ArrayValue(a: [Value]);
+
+Label(id: int);
+
+Operators ::= AssignmentOperator, ConditionalOperator;
+    AssignmentOperator(label: Label, var: Var, expr: Expr, goto: [Label]);
+    ConditionalOperator(label: Label, cond: CondOpForVM, ifGoto: [Label], elseGoto : [Label]);
+    
+CondOpForVM ::= CompOp, True, False;
+    True();
+    False();
+
+getVarsInProgram(decls: [Decl]) -> Triple<bool, string, Tree<Var, Type>> {
+    fold(decls, Triple(true, "", makeTree()), \triple, decl -> {
+        if (!triple.first) triple
+        else {
+            if (isExistVar(triple.third, decl.var)) {
+                Triple(false, "Re-declaring a variable", makeTree());
+            }
+            else Triple(triple.first, triple.second, setTree(triple.third, decl.var, decl.type))
+        }
+    })
+}
+
+isExistVar(vars: Tree<Var, Type>, var: Var) -> bool {
+    switch (lookupTree(vars, var)) {
+        Some(variable): true;
+        None(): false;
+    }
+}
+
+checkingProgramsVar(prog: Program) -> Pair<bool, string> {
+    vars = getVarsInProgram(prog.decls);
+    if (!vars.first) {
+		Pair(vars.first, vars.second);
+	}
+    else {
+        checkingBody(prog.body, vars.third);
+    }
+}
+
+checkingBody(bodyOfProgram: Body, vars: Tree<Var, Type>) -> Pair<bool, string> {
+    switch(bodyOfProgram) {
+        Assignment(var, expr): {
+            if (!isExistVar(vars, var)) { 
+                Pair(false, "An undeclared variable is used: " + var.name);
+            } else {
+                typeOfVar = either(lookupTree(vars, var), TypeInt());
+                result = checkingExpr(expr, vars);
+                if (!result.first) { Pair(result.first, result.second); }
+                else {
+                    if (typeOfVar == result.third) { Pair(true, ""); }
+                    else Pair(false, 
+                        "Error: It is not possible to assign " + type2s(typeOfVar) + 
+                        " to " + type2s(result.third));
+                }
+            }
+        }
+
+        Sequence(body) : {
+            fold(body, Pair(true, ""), \res, partOfBody -> {
+                if (!res.first) { res; }
+                else {
+                    checkingBody(partOfBody, vars);
+                }
+            });
+        }
+        
+        Test(cond) : {
+            ans = checkingCompOp(cond, vars);
+            if (!ans.first) { Pair(ans.first, ans.second); }
+            else { Pair(true, ""); }
+        }
+        
+        NonDetChoice(head, tailOfBody): {
+            body = concat([head], tailOfBody);
+            fold(body, Pair(true, ""), \res, partOfBody -> {
+                if (!res.first) { res; }
+                else {
+                    checkingBody(partOfBody, vars);
+                }
+            });
+        }
+        
+        NonDetIter(body): {
+            fold(body, Pair(true, ""), \res, partOfBody -> {
+                if (!res.first) { res; }
+                else {
+                    checkingBody(partOfBody, vars);
+                }
+            });
+        }
+    }
+}
+
+checkingExpr(expr: Expr, vars: Tree<Var, Type>) -> Triple<bool, string, Type> {
+    switch(expr) {
+        Int(value): checkingArithOp(expr, vars);
+        Var(name): checkingArithOp(expr, vars);
+        ArrayOp(): checkingArrayOp(expr, vars);
+        ArithOp(): checkingArithOp(expr, vars);
+    }
+}
+
+checkingArrayOp(expr: ArrayOp, vars: Tree<Var, Type>) -> Triple<bool, string, Type> {
+    switch (expr) {
+        Array(headOfArray, tailOfArray): Triple(true, "", TypeArray(TypeInt()))
+        App(array, index): {
+            verifiedArray = checkingArrayOp(array, vars);
+            verifiedIndex = checkingArithOp(index, vars);
+            if (!verifiedArray.first) verifiedArray
+            else if (!verifiedIndex.first) verifiedIndex
+            else {
+                // Утверждается, что verifiedArray имеет тип TypeArray;
+                
+                typeOfArray = cast (verifiedArray.third : Type -> TypeArray);
+                // TypeArray(t: Type)
+                Triple(true, "", typeOfArray.t);
+            }
+        }
+        Upd(array, index, value): {
+            verifiedArray = checkingArrayOp(array, vars);
+            verifiedIndex = checkingArithOp(index, vars);
+            verifiedValue = checkingArithOp(value, vars);
+            if (!verifiedArray.first) verifiedArray
+            else if (!verifiedIndex.first) verifiedIndex
+            else if (!verifiedValue.first) verifiedValue
+            else verifiedArray
+        }
+        Var(name): {
+            // Отсюда нам нужен только тип верхнего уровня(Т.е. TypeArray)
+            expectedType = TypeArray(TypeInt()); 
+            checkingTypeForVar(lookupTree(vars, expr), expectedType)
+        }
+    }
+}
+
+checkingArithOp(expr: ArithOp, vars: Tree<Var, Type>) -> Triple<bool, string, Type> {
+    switch (expr) {
+        Sum(left, right): checkingArithOpforBinOp(left, right, vars);
+        Sub(left, right): checkingArithOpforBinOp(left, right, vars);
+        Mult(left, right): checkingArithOpforBinOp(left, right, vars);
+        Div(left, right): checkingArithOpforBinOp(left, right, vars);
+        Var(name): checkingTypeForVar(lookupTree(vars, expr), TypeInt());
+        Int(value): Triple(true, "", TypeInt());
+    }
+}
+
+checkingCompOp(expr: CompOp, vars: Tree<Var, Type>) -> Triple<bool, string, Type> {
+    switch (expr) {
+        GreaterThan(left, right): checkingArithOpforBinOp(left, right, vars);
+        GreaterThanOrEqual(left, right): checkingArithOpforBinOp(left, right, vars);
+        LessThan(left, right): checkingArithOpforBinOp(left, right, vars);
+        LessThanOrEqual(left, right): checkingArithOpforBinOp(left, right, vars);
+        Equality(left, right): checkingArithOpforBinOp(left, right, vars);
+        NotEquality(left, right): checkingArithOpforBinOp(left, right, vars);
+        Not(value): checkingCompOp(value, vars);
+    }
+}
+
+checkingArithOpforBinOp(left: ArithOp, right: ArithOp, vars: Tree<Var, Type>) -> Triple<bool, string, Type> {
+    verifiedLeft = checkingArithOp(left, vars);
+    verifiedRight = checkingArithOp(right, vars);
+    if (!verifiedLeft.first) { verifiedLeft; }
+    else if (!verifiedRight.first) { verifiedRight; }
+    else if (verifiedLeft.third != verifiedRight.third) {
+        Triple(false, 
+        "Operation with incompatible types: 
+        type 1 = " + type2s(verifiedLeft.third) + 
+        ", type 2 = " + type2s(verifiedRight.third), TypeInt());
+    }
+    else verifiedLeft;
+}
+
+//Смотрим, получаем мы ожидаемый тип, или нет, если он ожидаемый, то сохраняем себе этот тип
+checkingTypeForVar(typeOfVar: Maybe<Type>, expectedType: Type) -> Triple<bool, string, Type> {
+    switch (typeOfVar) {
+        Some(type): {
+            if (type.structname == expectedType.structname) { Triple(true, "", type); }
+            else Triple(false, "The variable is " + type2s(type) + ", but expected: " + type2s(expectedType), TypeInt())
+        }
+        None(): Triple(false, "An undeclared variable is used", TypeInt());
+    }
+}
+
+Translator(vmProgram: string, currentLabel: int);
+
+prog2vm2s(prog: Program) {
+    pair = checkingProgramsVar(prog);
+    if (!pair.first) { pair.second; }
+    else {
+        state = Translator(decls2s(prog.decls) + "\n", 0);
+        currState = body2vm(prog.body, state);
+        currState.vmProgram + i2s(currState.currentLabel) + ":";
+    }
+}
+
+body2vm(body: Body, state: Translator) -> Translator {
+    newLabelInt = state.currentLabel + 1;
+    switch (body) {
+        // Translator(vmProgram: string, currentLabel: int);
+        Assignment(var, expr): {
+            Translator(state.vmProgram + 
+            operators2s(AssignmentOperator(Label(state.currentLabel), var, expr, [Label(newLabelInt)])) + "\n", newLabelInt);
+        }
+
+        Test(cond): {
+            Translator(state.vmProgram + 
+            operators2s(ConditionalOperator(Label(state.currentLabel), cond, [Label(newLabelInt)], [])) + "\n", newLabelInt);
+        }
+
+        Sequence(b): {
+            fold(b, state, \newState, bodyArg -> body2vm(bodyArg, newState));
+        }
+
+        NonDetChoice(h, t): {
+            // Проходим по всем телам внутри и получаем массив из тел
+            vmBodies = fold(t, [body2vm(h, Translator("", state.currentLabel + 1))],
+            \tmp, nextBody -> concat(tmp, [body2vm(nextBody, Translator("", tmp[length(tmp) - 1].currentLabel + 1))]));
+
+            nextLabels = map(vmBodies, \st -> st.currentLabel);
+            bodiesStartLabels = concat([state.currentLabel + 1], map(take(nextLabels, length(nextLabels) - 1), \label -> label + 1)); 
+
+            vmStartChoice = operators2s(trueIfOperator(state.currentLabel, bodiesStartLabels)) + "\n";
+
+            lastVmBody = vmBodies[length(vmBodies) - 1];
+            end = lastVmBody.currentLabel;
+            vmChoiceBodies = concatStrings(map(take(vmBodies, length(vmBodies) - 1), 
+                \st -> (st.vmProgram + operators2s(trueIfOperator(st.currentLabel, [end])) + "\n"))) + lastVmBody.vmProgram;
+            Translator(state.vmProgram + vmStartChoice + vmChoiceBodies, vmBodies[length(vmBodies) - 1].currentLabel);
+        };
+
+        NonDetIter(b): {
+            vmBody = fold(b, Translator("", newLabelInt), \newState, bodyArg -> body2vm(bodyArg, newState));
+            end = vmBody.currentLabel; 
+            //replacedVmProgram = replaceLabels(vmBody.vmProgram, end, state.currentLabel);
+            Translator(
+                state.vmProgram +
+                operators2s(trueIfOperator(state.currentLabel, [newLabelInt, end + 1])) + "\n" +
+                vmBody.vmProgram + 
+                operators2s(trueIfOperator(end, [state.currentLabel])) + "\n",
+                end + 1);
+        }
+    }
+}
+
+trueIfOperator(label: int, goto: [int]) -> ConditionalOperator {
+    ConditionalOperator(Label(label), True(), map(goto, \id -> Label(id)), []);
+}
+
+label2s(label: Label) -> string {
+    i2s(label.id);
+}
+
+operators2s(operators : Operators) -> string {
+	switch(operators) {
+		AssignmentOperator(label, var, expr, goto): {
+            label2s(label) + ": " + var.name + " := " + expr2s(expr) + " goto {" + strGlue(map(goto, label2s), ", ") + "}";
+        }
+		ConditionalOperator(label, cond, ifGoto, elseGoto):{  
+			label2s(label) + ": " + 
+            "if " + "(" + condOpForVM2s(cond) + ") " +
+			"then {" + strGlue(map(ifGoto, label2s), ",") + "} else " + 
+			"{" + strGlue(map(elseGoto, label2s), ",") + "}";
+        }
+	}
+} 
+
+condOpForVM2s(cond: CondOpForVM) -> string {
+    switch (cond) {
+        True(): "TRUE";
+        False(): "FALSE";
+        CompOp(): condOp2s(cond);
+    }
+}
+
+main() {
+    example = "
+            VAR n : INT;
+            VAR x : INT;
+            VAR y : INT;
+            {
+                x := 22; 
+                y := 15;
+                {
+                    { { (x > y) ? ; x := (x - y); } U
+                    { (x < y) ? ; y := (y - x); } }
+                }*
+                (x == y) ?;
+            }
+	"
+
+	prog = parser(example);
+    println(prog2s(prog));
+    println(prog2vm2s(prog));
+}
+
+

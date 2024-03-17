@@ -1,0 +1,20 @@
+import VM;
+import validate;
+
+main() {
+    nemoProgText = getFileContent("test1.txt");
+	//println(nemoProgText);
+
+	nemoProg = s2nemo(nemoProgText);
+	println(nemoProg);
+	
+	switch(checkProg(nemoProg)) {
+		Error(info) : println("ERROR: " + info);
+		Success(info) : {
+			vmProg = translateNemo(nemoProg);
+			println(vm2s(vmProg));
+		}
+	}
+	
+	quit(0);
+}

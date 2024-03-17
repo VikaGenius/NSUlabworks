@@ -1,0 +1,82 @@
+import lingo/pegcode/driver;
+import string;
+
+Exp ::= Sum, Sub, Mult, Div, APP, UPD, Cond, Int, Var;
+    Sum(left: Exp, right: Exp);
+    Sub(left: Exp, right: Exp);
+    Div(left: Exp, right: Exp);
+    Mult(left: Exp, right: Exp);
+    APP(var: Var, ind: Int);
+    UPD(var: Var, ind: Int, val: Exp);
+    Sum(left: Exp, right: Exp);
+    Var(name: string);
+
+Type ::= INT, ARRAY;
+    INT();
+    ARRAY(type: Type);
+
+VarDecl(var: Var, type: Type);
+
+Val::= Int, Arr;
+    Int(val: int);
+    Arr(val: [Val]);
+
+CondExpr::= Exp, Cond;
+
+Cond::= Not, Less, More, LessEqual, MoreEqual;
+    Not(exp: CondExpr);
+    Less(left: CondExpr, right: CondExpr);
+    More(left: CondExpr, right: CondExpr);
+    LessEqual(left: CondExpr, right: CondExpr);
+    MoreEqual(left: CondExpr, right: CondExpr);
+    
+
+Body::= Assign, Iter, Sequence, Test, Select;
+    Assign(var: Var, exp: Exp);
+    Sequence(bodies: [Body]);
+    Test(cond: Cond);
+    Iter(body: Body);
+    Select(begin: Body, variants: [Body]);
+
+Program(vars: [Var], body: Body);
+
+parser(str: string) -> Program {
+    e_gr = "#include grammar1.lingo";
+    parsic(
+        compilePegGrammar(e_gr),
+        str,
+        defaultPegActions
+    );
+}
+
+main() {
+    example = "
+            VAR n : INT;
+VAR x : INT;
+VAR y : INT;
+{ (n >= 0) }
+{
+	x := 0;
+	y := 0;
+	{ ((n >= 0) & ((y = (x * x)) & ((((x - 1) * (x - 1)) <= n) V (x = 0)))) }
+	{
+		{
+			(y <= n)?;
+			y := (y + (x + (x + 1)));
+			x := (x + 1)
+		}*;
+		(NOT(y <= n))?;
+	}
+	x := (x - 1);
+}
+{ (((x * x) <= n) & (((1 + x)*(1 + x)) > n)) }
+            }"
+
+    println(parser(example));
+
+}
+
+
+
+
+

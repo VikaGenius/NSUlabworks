@@ -1,0 +1,41 @@
+import lingo/pegcode/driver;
+
+export {
+    ArExpr ::= ArSum, ArMult, ArInt;
+            ArSum(left: ArExpr, right : ArExpr);
+            ArMult(left: ArExpr, right : ArExpr);
+            
+}
+
+s2ar(str : string) -> ArExpr {
+    e_gr = "#include grammar.lingo";
+    parsic(
+        compilePegGrammar(e_gr),
+        str,
+        SemanticActions(setTree(defaultPegActions.t, "createArInt", \s -> ArInt(s2i(s[0]))))
+    )
+}
+
+calculate(exp : ArExpr) -> int {
+    switch (exp) 
+    {
+        ArInt(val) : val;
+        ArSum(left, right) : calculate(left) + calculate(right);
+        ArMult(left, right) : calculate(left) * calculate(right);
+    }    
+}
+
+
+t2s(exp: ArExpr) -> string {
+    switch (exp) {
+        ArInt(val) : i2s(val) ;
+        ArSum(left, right) : "(" + t2s(left) + " + " + t2s(right) + ")";
+        ArMult(left, right) : "(" + t2s(left) + " * " + t2s(right) + ")";
+    }
+}
+
+main () {
+    str = "(2 * 3)";
+    println(i2s(calculate(s2ar(str))));
+    println(t2s(s2ar(str)));
+}
