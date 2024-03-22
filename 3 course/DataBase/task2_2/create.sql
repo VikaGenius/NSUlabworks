@@ -1,19 +1,21 @@
 CREATE TABLE Stations (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL
+    s_name VARCHAR(255) NOT NULL
 );
 
 CREATE TABLE Marshrut (
-    m_num INTEGER PRIMARY KEY,
-    station_id INTEGER REFERENCES Stations(id) NOT NULL,
-    order1 INTEGER --порядок станции внутри маршрута
+    m_num INTEGER,
+    station_id INTEGER REFERENCES Stations(id),
+    order1 INTEGER, --порядок станции внутри маршрута
+    PRIMARY KEY(m_num, station_id)
 );
 
 CREATE TABLE TMarshrut ( --склейка маршрутов
-    m_num INTEGER PRIMARY KEY,
-    station_id INTEGER REFERENCES Stations(id) NOT NULL,
+    m_num INTEGER,
+    station_id INTEGER REFERENCES Stations(id),
     order1 INTEGER,
-    pm_num INTEGER REFERENCES Marshrut(m_num) NOT NULL
+    pm_num INTEGER REFERENCES Marshrut(m_num),
+    PRIMARY KEY (m_num, station_id, pm_num)
 );
 
 CREATE TABLE Employees (
@@ -32,8 +34,9 @@ CREATE TABLE Trains (
 );
 
 CREATE TABLE Train_Empl (
-    train_num INTEGER REFERENCES Trains(num) NOT NULL,
-    empl_id INTEGER REFERENCES Employees(id) NOT NULL
+    train_num INTEGER REFERENCES Trains(num),
+    empl_id INTEGER REFERENCES Employees(id),
+    PRIMARY KEY (train_num, empl_id)
 );
 
 CREATE TABLE Waitings (
@@ -41,18 +44,36 @@ CREATE TABLE Waitings (
     train_num INTEGER REFERENCES Trains(num) NOT NULL,
     dt DATE NOT NULL,
     napr VARCHAR(255) NOT NULL,
-    value INTEGER NOT NULL --время, на которое задерживается поезд
+    val INTEGER NOT NULL --время, на которое задерживается поезд
 );
 
-CREATE TABLE TIMETABLE (
-    id SERIAL PRIMARY KEY,
-    train_num INTEGER REFERENCES Trains(num) NOT NULL,
-    station_id INTEGER REFERENCES Stations(id) NOT NULL,
-    dt1 DATE NOT NULL,
-    dt2 DATE NOT NULL CHECK(dt2 > dt1),
+CREATE TABLE Timetable (
+    id_ INTEGER,
+    train_num INTEGER REFERENCES Trains(num),
+    station_id INTEGER REFERENCES Stations(id),
+    dt1 TIMESTAMP NOT NULL,
+    dt2 TIMESTAMP NOT NULL CHECK(dt2 > dt1),
     napr VARCHAR(255) NOT NULL,
-    tickets INTEGER NOT NULL --количество купленных или оставшихся билетов (мне нравится 2 варик)
+    tickets INTEGER NOT NULL, --количество купленных или оставшихся билетов (мне нравится 2 варик)
+    PRIMARY KEY (id, train_num, station_id) --id увеличивается, если уже есть запись в расписании с таким поездом и станцией
 );
 
---добавить таблицу с билетами
---добавить таблицу с пассажирами
+CREATE TABLE Distance (
+    src_id INTEGER REFERENCES Stations(id),
+    dst_id INTEGER REFERENCES Stations(id),
+    distance_km INTEGER NOT NULL,
+    PRIMARY KEY (src_id, dst_id)
+);
+
+CREATE TABLE Tickets (
+    id SERIAL PRIMARY KEY,
+    timetable_id_src INTEGER,
+    station_id_src INTEGER,
+    train_num INTEGER,
+    timetable_id_dst INTEGER,
+    station_id_dst INTEGER,
+    FOREIGN KEY(timetable_id_src, train_num, station_id_src) REFERENCES Timetable(id, train_num, station_id) NOT NULL,
+    FOREIGN KEY(timetable_id_dst, train_num, station_id_dst) REFERENCES Timetable(id, train_num, station_id) NOT NULL
+);
+
+
