@@ -1,13 +1,13 @@
 --Написать триггер, проверяющий, корректные ли данные вносятся в timetable в части 
 --соответствия поезда и станции назначенному на данный поезд маршруту.
 
-CREATE OR REPLACE FUNCTION check_consistency_trains_and_stations
+CREATE OR REPLACE FUNCTION check_consistency_trains_and_stations()
 RETURNS TRIGGER AS $$
 BEGIN 
-    IF NOT EXIST (
+    IF NOT EXISTS (
         SELECT 1
         FROM Trains T JOIN Marshrut M ON T.m_num = M.m_num
-        WHEN T.num = NEW.train_num AND M.station_id = NEW.station_id
+        WHERE T.num = NEW.train_num AND M.station_id = NEW.station_id
     ) THEN
         RAISE EXCEPTION 'Несоответствие поезда и станции назначенному на данный поезд маршруту';
     END IF;
@@ -15,7 +15,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER check_timetable 
+CREATE OR REPLACE TRIGGER check_timetable_trigger 
 BEFORE INSERT ON Timetable 
 FOR EACH ROW
 EXECUTE FUNCTION check_consistency_trains_and_stations();
@@ -57,6 +57,15 @@ BEGIN
     FROM Marshrut
     WHERE m_num = marshrut_num AND order1 = station_order - 1;
 
+    -- проверяем, есть ли запись для предыдущей станции в маршруте. если нет, нельзя вставить
+    IF NOT EXISTS (
+        SELECT 1 FROM Timetable 
+        WHERE station_id = prev_station_id
+        AND id = NEW.id AND train_num = NEW.train_num
+    ) THEN
+        RAISE EXCEPTION 'Вставляйте записи в расписание в нужном порядке.';
+    END IF;
+
     -- получаю предыдущее время для данного поезда 
     SELECT dt2 INTO prev_time
     FROM Timetable T
@@ -65,7 +74,7 @@ BEGIN
 
     IF prev_time IS NOT NULL AND NEW.dt1 <= prev_time THEN
     -- ищу интервал
-        SELECT COALESCE(T2.dt1 - T1.dt2, '15 minutes') INTO specified_interval
+        SELECT COALESCE(AVG(T2.dt1 - T1.dt2), '15 minutes'::INTERVAL) INTO specified_interval
         FROM (
             SELECT *
             FROM Timetable
@@ -88,3 +97,8 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER check_schedule_time_trigger 
+BEFORE INSERT ON Timetable 
+FOR EACH ROW
+EXECUTE FUNCTION check_schedule_time();
