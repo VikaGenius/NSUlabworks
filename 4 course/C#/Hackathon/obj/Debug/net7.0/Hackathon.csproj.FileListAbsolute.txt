@@ -1,0 +1,15 @@
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/bin/Debug/net7.0/Hackathon
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/bin/Debug/net7.0/Hackathon.deps.json
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/bin/Debug/net7.0/Hackathon.runtimeconfig.json
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/bin/Debug/net7.0/Hackathon.dll
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/bin/Debug/net7.0/Hackathon.pdb
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/obj/Debug/net7.0/Hackathon.csproj.AssemblyReference.cache
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/obj/Debug/net7.0/Hackathon.GeneratedMSBuildEditorConfig.editorconfig
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/obj/Debug/net7.0/Hackathon.AssemblyInfoInputs.cache
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/obj/Debug/net7.0/Hackathon.AssemblyInfo.cs
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/obj/Debug/net7.0/Hackathon.csproj.CoreCompileInputs.cache
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/obj/Debug/net7.0/Hackathon.dll
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/obj/Debug/net7.0/refint/Hackathon.dll
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/obj/Debug/net7.0/Hackathon.pdb
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/obj/Debug/net7.0/Hackathon.genruntimeconfig.cache
+/home/vikagenius/github/NSUlabworks/4 course/C#/Hackathon/obj/Debug/net7.0/ref/Hackathon.dll
